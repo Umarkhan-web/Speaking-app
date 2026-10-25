@@ -1,0 +1,42 @@
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Node dependencies & caches
+node_modules/
+.npm/
+.vite/
+
+# Python bytecode & caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Local secret files (.env)
+speaking-analyzer/.env
+frontend/.env
+telegram-bot/.env
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+dist/
+frontend/dist/
+speaking-analyzer/dist/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs & Temp
+*.log
+npm-debug.log*
+yarn-debug.log*
+temp/
+tmp/
