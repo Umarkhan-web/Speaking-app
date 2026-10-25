@@ -79,46 +79,23 @@ export function App() {
     return localStorage.getItem("birdan.onboarded") !== "true";
   });
 
-  // Ilovaga kirishda rasmlarni oldindan to'liq keshlab, chiroyli loader ko'rsatish
+  // Ilovaga tezkor va silliq kirish: ortiqcha kutishlarsiz (maksimal 450ms)
   useEffect(() => {
     let mounted = true;
-    const startTime = Date.now();
 
-    const preloadImages = async () => {
-      const urls = [
-        "/onboarding_1.webp",
-        "/onboarding_2.webp",
-        "/onboarding_3.webp",
-        "/onboarding_1.png",
-        "/onboarding_2.png",
-        "/onboarding_3.png",
-      ];
+    // Rasmlarni orqa fonda tezkor yuklab olish (foydalanuvchini kutdirmaydi)
+    ["/onboarding_1.webp", "/onboarding_2.webp", "/onboarding_3.webp"].forEach((src) => {
+      const img = new Image();
+      img.src = src;
+    });
 
-      const promises = urls.map(
-        (url) =>
-          new Promise((resolve) => {
-            const img = new Image();
-            img.src = url;
-            img.onload = () => resolve(true);
-            img.onerror = () => resolve(false);
-          })
-      );
-
-      await Promise.allSettled(promises);
-
-      const elapsed = Date.now() - startTime;
-      const minDisplay = 800; // 800ms elegant splash
-      const remaining = Math.max(0, minDisplay - elapsed);
-
-      setTimeout(() => {
-        if (mounted) setAppReady(true);
-      }, remaining);
-    };
-
-    preloadImages();
+    const timer = setTimeout(() => {
+      if (mounted) setAppReady(true);
+    }, 450);
 
     return () => {
       mounted = false;
+      clearTimeout(timer);
     };
   }, []);
 
@@ -131,7 +108,13 @@ export function App() {
 
   // Supabase Auth and Cloud Data Sync
   useEffect(() => {
+    // Qotib qolishni oldini olish: maksimal 500ms dan ortiq kutmaydi
+    const authSafetyTimer = setTimeout(() => {
+      setLoadingAuth(false);
+    }, 500);
+
     if (!supabase) {
+      clearTimeout(authSafetyTimer);
       setLoadingAuth(false);
       return;
     }
@@ -173,6 +156,7 @@ export function App() {
         }
       })
       .finally(() => {
+        clearTimeout(authSafetyTimer);
         setLoadingAuth(false);
       });
 
