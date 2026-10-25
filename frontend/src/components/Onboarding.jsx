@@ -179,7 +179,16 @@ export function Onboarding({ onComplete }) {
         }}
       >
         {!imgErrors[current] ? (
-          <picture style={{ width: "100%", height: "100%", display: "block" }}>
+          <picture
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              display: "block",
+            }}
+          >
             {slide.webp && <source srcSet={slide.webp} type="image/webp" />}
             <img
               key={slide.img}
@@ -190,7 +199,7 @@ export function Onboarding({ onComplete }) {
                 width: "100%",
                 height: "100%",
                 objectFit: "cover",
-                objectPosition: "center center",
+                objectPosition: "center 15%",
                 display: "block",
                 animation: "scr 0.35s ease-out",
               }}
