@@ -377,7 +377,7 @@ export function PracticeSession({
             </div>
 
             {/* Countdown ring */}
-            <div className="ringwrap" style={{ margin: "10px auto" }}>
+            <div className="ringwrap sm" style={{ margin: "6px auto 4px" }}>
               <svg className="ring" viewBox="0 0 200 200" aria-hidden="true">
                 <circle className="tk" cx="100" cy="100" r="88" />
                 <circle
