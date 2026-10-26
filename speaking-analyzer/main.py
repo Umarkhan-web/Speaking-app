@@ -21,26 +21,24 @@ app = FastAPI(title="AI Speaking Analyzer")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5174",
-        "http://localhost:3000",
-    ],
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-print("Whisper modeli yuklanmoqda...")
-whisper_model = WhisperModel(
-    "small",
-    device="cpu",
-    compute_type="int8",
-)
-print("Whisper tayyor!")
+whisper_model = None
+
+def get_whisper():
+    global whisper_model
+    if whisper_model is None:
+        try:
+            print("[Whisper] Model yuklanmoqda...")
+            whisper_model = WhisperModel("tiny", device="cpu", compute_type="int8")
+            print("[Whisper] Model tayyor!")
+        except Exception as e:
+            print("[Whisper] Yuklanmadi (Gemini Audio ishlatiladi):", e)
+    return whisper_model
 
 
 class AnalyzeRequest(BaseModel):
@@ -96,22 +94,24 @@ async def transcribe(file: UploadFile = File(...)):
         info_lang = "en"
         avg_logprob = -0.3
 
-        try:
-            segments, info = whisper_model.transcribe(
-                temp_path,
-                language="en",
-                beam_size=5,
-                vad_filter=True,
-                vad_parameters=dict(min_silence_duration_ms=300, speech_pad_ms=200),
-                initial_prompt="IELTS Speaking candidate response. Spoken in English with potential Central Asian, Uzbek, or international accent. Recognize spoken words verbatim, proper punctuation.",
-            )
-            segment_list = list(segments)
-            info_duration = round(info.duration, 2)
-            info_lang = info.language
-            if segment_list:
-                avg_logprob = round(sum(s.avg_logprob for s in segment_list) / len(segment_list), 3)
-        except Exception as w_err:
-            print("[Whisper] STT xatolik (Gemini Audio ishlatiladi):", w_err)
+        model = get_whisper()
+        if model is not None:
+            try:
+                segments, info = model.transcribe(
+                    temp_path,
+                    language="en",
+                    beam_size=5,
+                    vad_filter=True,
+                    vad_parameters=dict(min_silence_duration_ms=300, speech_pad_ms=200),
+                    initial_prompt="IELTS Speaking candidate response. Spoken in English with potential Central Asian, Uzbek, or international accent. Recognize spoken words verbatim, proper punctuation.",
+                )
+                segment_list = list(segments)
+                info_duration = round(info.duration, 2)
+                info_lang = info.language
+                if segment_list:
+                    avg_logprob = round(sum(s.avg_logprob for s in segment_list) / len(segment_list), 3)
+            except Exception as w_err:
+                print("[Whisper] STT xatolik (Gemini Audio ishlatiladi):", w_err)
 
         subtitles = [
             {
@@ -473,4 +473,10 @@ else:
     @app.get("/")
     def serve_fallback_root():
         return {"message": "AI Speaking Analyzer ishlayapti! (Frontend dist topilmadi)"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
 
