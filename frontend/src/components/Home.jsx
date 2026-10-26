@@ -397,11 +397,11 @@ export function Home({
                 <span className="streak-day-name">{dayLabel}</span>
                 <div className="streak-day-icon-wrap">
                   {done ? (
-                    <Icon3D name="check" size={20} />
+                    <Icon3D name="check" size={16} />
                   ) : isToday ? (
-                    <Icon3D name="target" size={20} />
+                    <Icon3D name="target" size={16} />
                   ) : (
-                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#ccd2e8" }} />
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#ccd2e8" }} />
                   )}
                 </div>
               </div>

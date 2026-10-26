@@ -50,7 +50,15 @@ export function PracticeSession({
 
   // Audio wave visualizer ref
   const waveAnimRef = useRef(null);
+  const sheetRef = useRef(null);
   const [audioLevel, setAudioLevel] = useState(0);
+
+  // Har bir bosqich almashganda sahifani eng tepaga qaytarish (kesilib qolishni oldini oladi)
+  useEffect(() => {
+    if (sheetRef.current) {
+      sheetRef.current.scrollTop = 0;
+    }
+  }, [phase]);
 
   // Stable references for props to prevent effect re-triggering
   const onSaveSessionRef = useRef(onSaveSession);
@@ -325,7 +333,7 @@ export function PracticeSession({
 
   return (
     <div id="session" className={`ph-${phase}`}>
-      <div className="sheet">
+      <div className="sheet" ref={sheetRef}>
         {/* Top bar */}
         <div className="sb">
           <button className="x" onClick={onClose} aria-label="Yopish">
@@ -462,15 +470,17 @@ export function PracticeSession({
 
         {/* ===================== 2. SPEAK PHASE ===================== */}
         {phase === "speak" && (
-          <>
+          <div className="speak-phase-container">
             {/* Topic mini card */}
             <div className="combo pc mini">
               <div className="ct">{topic.en}</div>
-              <ul>
-                {topic.q?.map((q, i) => (
-                  <li key={i}>{q}</li>
-                ))}
-              </ul>
+              {topic.q && topic.q.length > 0 && (
+                <ul>
+                  {topic.q.slice(0, 2).map((q, i) => (
+                    <li key={i}>{q}</li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             {/* Smaller countdown ring */}
@@ -492,10 +502,10 @@ export function PracticeSession({
 
             {/* Equalizer audio wave */}
             <div className="wave">
-              {Array.from({ length: 26 }).map((_, i) => {
+              {Array.from({ length: 24 }).map((_, i) => {
                 const waveHeight = Math.max(
-                  0.12,
-                  Math.min(1, 0.12 + audioLevel * 2.5 * (0.6 + Math.sin(i * 0.4) * 0.4))
+                  0.15,
+                  Math.min(1, 0.15 + audioLevel * 2.4 * (0.6 + Math.sin(i * 0.4) * 0.4))
                 );
                 return (
                   <i
@@ -508,39 +518,35 @@ export function PracticeSession({
               })}
             </div>
 
-            {/* Status box */}
-            <div className="live pc">
-              <span className="ph0">
-                🔴 Audio yozilmoqda... Ingliz tilida ravon gapiring!
-              </span>
+            {/* Clean, pulsing live recording status badge */}
+            <div className="rec-badge">
+              <span className="rec-dot" />
+              <span>Mikrofon tinglamoqda — inglizcha gapiring</span>
             </div>
 
-            <div className="stt">
-              <i className="on" />
-              <span>Mikrofon tinglamoqda. To‘xtatish uchun tugmani bosing.</span>
-            </div>
-
-            {/* Phrase helpers cloud (no horizontal scrolling) */}
+            {/* Phrase helpers (essential 4-5 starters, fits nicely on screen) */}
             {profile.help && (
-              <div className="phrases-cloud">
-                <div className="phrases-cloud-items">
-                  {PHRASES.flatMap(([, list]) => list).slice(0, 12).map(([enText], idx) => (
-                    <span className="ph" key={idx}>
-                      {enText}
-                    </span>
-                  ))}
+              <div className="speak-phrases">
+                <div className="speak-phrases-label">Yordamchi iboralar:</div>
+                <div className="speak-phrases-chips">
+                  {["Today I'd like to talk about...", "For example,...", "What's more,...", "In my opinion,..."]
+                    .map((enText, idx) => (
+                      <span className="speak-chip" key={idx}>
+                        {enText}
+                      </span>
+                    ))}
                 </div>
               </div>
             )}
 
-            {/* Stop button */}
+            {/* Stop button (clear spacing, never covered) */}
             <div className="foot-s">
               <button className="bigbtn stop" onClick={stopRecording} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
                 <Icon3D name="cross" size={22} />
                 Tugatish
               </button>
             </div>
-          </>
+          </div>
         )}
 
         {/* ===================== 3. LOADING PHASE ===================== */}
