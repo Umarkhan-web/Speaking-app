@@ -160,8 +160,8 @@ export function Home({
 
   return (
     <section className="screen on" aria-label="Mashq">
-      {/* Header */}
-      <header className="top" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+      {/* Compact Header */}
+      <header className="top" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "8px" }}>
         <div className="brand disp">
           Birdan<i>!</i>
         </div>
@@ -214,16 +214,8 @@ export function Home({
         </div>
       </header>
 
-      {/* Greeting */}
-      <h1 className="hello disp" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-        <Icon3D name="wave" size={30} />
-        <span>
-          {greeting}, {user?.user_metadata?.full_name?.split(" ")[0] || profile.name || user?.email?.split("@")[0] || "notiq"}!
-        </span>
-      </h1>
-
       {/* Level Selection */}
-      <div className="seg" role="group" aria-label="Daraja">
+      <div className="seg" role="group" aria-label="Daraja" style={{ marginBottom: "10px" }}>
         {[1, 2, 3].map((lvl) => (
           <button
             key={lvl}
@@ -232,25 +224,6 @@ export function Home({
           >
             <b>{LVC[lvl]}</b>
             <small>{LVN[lvl]}</small>
-          </button>
-        ))}
-      </div>
-
-      {/* Compact Categories Bar (No horizontal scroll, takes minimal space) */}
-      <div className="cats" role="group" aria-label="Turkum">
-        {[
-          ["today", CAT_LABELS.today],
-          ["all", CAT_LABELS.all],
-          ...Object.keys(CATS)
-            .filter((k) => k !== "custom")
-            .map((k) => [k, CAT_LABELS[k] || CATS[k]]),
-        ].map(([catKey, label]) => (
-          <button
-            key={catKey}
-            aria-pressed={profile.cat === catKey}
-            onClick={() => handleSelectCategory(catKey)}
-          >
-            {label}
           </button>
         ))}
       </div>
@@ -290,31 +263,32 @@ export function Home({
                   {LVC[currentTopic.lvl]} {LVN[currentTopic.lvl]}
                 </span>
                 {profile.cat === "today" && (
-                  <span className="stk c3">Bugungi mavzu</span>
+                  <span className="stk c3">Bugungi</span>
                 )}
               </div>
 
               <h2 className="cue-h disp">{currentTopic.en}</h2>
               <p className="cue-uz">{currentTopic.uz}</p>
-              <p className="cue-hint">{currentTopic.hint}</p>
 
-              <ul className="cue-q">
-                {currentTopic.q?.map((item, idx) => (
-                  <li key={idx}>{item}</li>
-                ))}
-              </ul>
+              {currentTopic.q && currentTopic.q.length > 0 && (
+                <ul className="cue-q">
+                  {currentTopic.q.slice(0, 2).map((item, idx) => (
+                    <li key={idx}>{item}</li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
         </article>
       </div>
 
-      {/* Cue Action Buttons (Only 2 original buttons, no extra AI button) */}
-      <div className="cuebtns">
+      {/* Cue Action Buttons */}
+      <div className="cuebtns" style={{ marginTop: "10px" }}>
         <button
           onClick={handleShuffle}
-          style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
+          style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
         >
-          <Icon3D name="dice" size={20} />
+          <Icon3D name="dice" size={18} />
           Boshqa mavzu
         </button>
 
@@ -323,35 +297,29 @@ export function Home({
             buzz(8, profile.haptic);
             setCustomMode(!customMode);
           }}
-          style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
+          style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
         >
-          <Icon3D name="memo" size={20} />
-          {customMode ? "Mavzularga qaytish" : "O‘z mavzum"}
+          <Icon3D name="memo" size={18} />
+          {customMode ? "Orqaga" : "O‘z mavzum"}
         </button>
       </div>
 
-      {/* Duration Mode Selection (Vaqt rejimini tanlash) */}
-      <div style={{ marginTop: "14px" }}>
-        <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--muted)", marginBottom: "6px", display: "flex", alignItems: "center", gap: "6px" }}>
-          <Icon3D name="clock" size={18} />
-          <span>Gapirish davomiyligi:</span>
-        </div>
-        <div className="seg" role="group" aria-label="Vaqt" style={{ margin: 0 }}>
-          {Object.entries(MODES).map(([key, val]) => (
-            <button
-              key={key}
-              aria-pressed={profile.mode === key}
-              onClick={() => handleSelectMode(key)}
-            >
-              <b>{val.n}</b>
-              <small>{val.s}</small>
-            </button>
-          ))}
-        </div>
+      {/* Duration Mode Selection */}
+      <div className="seg" role="group" aria-label="Vaqt" style={{ marginTop: "12px", marginBottom: "8px" }}>
+        {Object.entries(MODES).map(([key, val]) => (
+          <button
+            key={key}
+            aria-pressed={profile.mode === key}
+            onClick={() => handleSelectMode(key)}
+          >
+            <b>{val.n}</b>
+            <small>{val.s}</small>
+          </button>
+        ))}
       </div>
 
-      {/* Primary Action Button (Katta boshlash tugmasi) */}
-      <div className="cta" style={{ marginTop: "14px" }}>
+      {/* Primary Action Button - Sticky CTA */}
+      <div className="cta">
         <button
           className="btn go"
           onClick={() => onStartSession(currentTopic)}
@@ -360,80 +328,6 @@ export function Home({
           <Icon3D name="rocket" size={26} />
           Gapirishni boshlash
         </button>
-      </div>
-
-      {/* Gamified 3D Streak & Weekly Tracker */}
-      <div className="streak-card">
-        <div className="streak-card-top">
-          <div className="streak-title-wrap">
-            <Icon3D name="fire" size={32} />
-            <div>
-              <h3>Haftalik Mashq</h3>
-              <p>
-                {currentStreak > 0
-                  ? `🔥 ${currentStreak} kunlik ketma-ketlik davom etmoqda!`
-                  : "Bugungi ilk mashqni boshlang!"}
-              </p>
-            </div>
-          </div>
-          <div className="streak-badge">
-            <Icon3D name={todaySessions >= goalTarget ? "check" : "target"} size={16} />
-            <span>{todaySessions >= goalTarget ? "Bajarildi" : `${todaySessions}/${goalTarget}`}</span>
-          </div>
-        </div>
-
-        {/* 7 Day Capsules */}
-        <div className="streak-days">
-          {weekDays.map((dayLabel, i) => {
-            const d = new Date(now);
-            d.setDate(now.getDate() - dow + i);
-            const done = !!daysSet[dkey(d)];
-            const isToday = i === dow;
-            return (
-              <div
-                key={dayLabel}
-                className={`streak-day-capsule ${done ? "done" : isToday ? "today" : ""}`}
-              >
-                <span className="streak-day-name">{dayLabel}</span>
-                <div className="streak-day-icon-wrap">
-                  {done ? (
-                    <Icon3D name="check" size={16} />
-                  ) : isToday ? (
-                    <Icon3D name="target" size={16} />
-                  ) : (
-                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#ccd2e8" }} />
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Weekly Progress bar */}
-        <div className="streak-progress-box">
-          <span>Haftalik natija:</span>
-          <div className="streak-bar-bg">
-            <div
-              className="streak-bar-fill"
-              style={{
-                width: `${Math.round(
-                  (weekDays.filter((_, i) => {
-                    const d = new Date(now);
-                    d.setDate(now.getDate() - dow + i);
-                    return !!daysSet[dkey(d)];
-                  }).length / 7) * 100
-                )}%`,
-              }}
-            />
-          </div>
-          <span style={{ fontWeight: 800 }}>
-            {weekDays.filter((_, i) => {
-              const d = new Date(now);
-              d.setDate(now.getDate() - dow + i);
-              return !!daysSet[dkey(d)];
-            }).length} / 7 kun
-          </span>
-        </div>
       </div>
     </section>
   );

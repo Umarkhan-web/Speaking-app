@@ -364,18 +364,20 @@ export function PracticeSession({
         {phase === "think" && (
           <>
             {/* Topic preview card */}
-            <div className="combo pc">
-              <div className="ct">{topic.en}</div>
-              <div className="cu">{topic.uz}</div>
-              <ul>
-                {topic.q?.map((q, i) => (
-                  <li key={i}>{q}</li>
-                ))}
-              </ul>
+            <div className="combo pc" style={{ padding: "14px 16px 12px" }}>
+              <div className="ct" style={{ fontSize: "22px", marginBottom: "4px" }}>{topic.en}</div>
+              <div className="cu" style={{ fontSize: "14px", marginBottom: "8px" }}>{topic.uz}</div>
+              {topic.q && topic.q.length > 0 && (
+                <ul style={{ margin: "4px 0 0" }}>
+                  {topic.q.slice(0, 2).map((q, i) => (
+                    <li key={i}>{q}</li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             {/* Countdown ring */}
-            <div className="ringwrap">
+            <div className="ringwrap" style={{ margin: "10px auto" }}>
               <svg className="ring" viewBox="0 0 200 200" aria-hidden="true">
                 <circle className="tk" cx="100" cy="100" r="88" />
                 <circle
@@ -391,74 +393,46 @@ export function PracticeSession({
               <div className="rnum">{displaySeconds}</div>
             </div>
 
-            {/* Sentence starter helpers */}
+            {/* Compact Sentence Starter Helpers */}
             {profile.help && (
-              <div className="hlp pc">
-                <h4>Gap shablonlari</h4>
-                {PHRASES.map(([groupTitle, phraseList], idx) => (
-                  <div className="hrow" key={idx}>
-                    <b>{groupTitle}</b>
-                    {phraseList.map(([enText, uzText], i) => (
-                      <span
-                        className="ph"
-                        key={i}
-                        onClick={() => handleInsertPhrase(enText)}
-                        style={{ cursor: "pointer" }}
-                      >
-                        {enText}
-                        <small>{uzText}</small>
-                      </span>
-                    ))}
-                  </div>
-                ))}
+              <div className="hlp-compact">
+                <div className="hlp-label">Foydali iboralar:</div>
+                <div className="hlp-chips">
+                  {[
+                    "Today I'd like to talk about...",
+                    "For example,...",
+                    "What's more,...",
+                    "In my opinion,...",
+                    "To sum up,...",
+                    "I believe that...",
+                  ].map((phrase, i) => (
+                    <button
+                      type="button"
+                      className="ph-chip"
+                      key={i}
+                      onClick={() => handleInsertPhrase(phrase)}
+                    >
+                      {phrase}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
-            {/* 3 Outline planning steps */}
-            <div className="steps">
-              {["Boshlanish: birinchi gap", "Misol yoki hikoya", "Xulosa: oxirgi gap"].map(
-                (placeholder, i) => (
-                  <label className="stp" key={i}>
-                    <i>{i + 1}</i>
-                    <input
-                      type="text"
-                      maxLength={70}
-                      placeholder={placeholder}
-                      value={notes[i]}
-                      onChange={(e) => {
-                        const next = [...notes];
-                        next[i] = e.target.value;
-                        setNotes(next);
-                      }}
-                      autoComplete="off"
-                    />
-                  </label>
-                )
-              )}
-            </div>
-
-            {/* Microphone Status & Test Chip (Ko'chirilgan: Gapirishdan oldingi tayyorgarlik) */}
-            {onOpenMicTest && (
+            {/* Microphone Status (Only if denied or needed) */}
+            {onOpenMicTest && micStatus === "denied" && (
               <button
-                className={`micchip ${
-                  micStatus === "granted" ? "ok" : micStatus === "denied" ? "bad" : ""
-                }`}
+                className="micchip bad"
                 onClick={onOpenMicTest}
                 type="button"
-                style={{ margin: "14px 0 6px", display: "flex", alignItems: "center", gap: "8px" }}
+                style={{ margin: "10px 0", display: "flex", alignItems: "center", gap: "8px" }}
               >
                 <Icon3D name="mic" size={20} />
-                <span>
-                  {micStatus === "granted"
-                    ? "Mikrofon tayyor (sinab ko‘rish)"
-                    : micStatus === "denied"
-                    ? "Mikrofon bloklangan (sozlash)"
-                    : "Mikrofonni tekshirish"}
-                </span>
+                <span>Mikrofon bloklangan (ruxsat berish)</span>
               </button>
             )}
 
-            {/* Action ready button */}
+            {/* Action ready button - Sticky Foot */}
             <div className="foot-s">
               <button className="bigbtn" onClick={startSpeakPhase} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
                 <Icon3D name="rocket" size={24} />
