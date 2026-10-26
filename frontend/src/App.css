@@ -459,27 +459,7 @@ button:hover .icon-3d,
 
 .deck::before,
 .deck::after {
-  content: "";
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  top: 10px;
-  bottom: -6px;
-  background: var(--paper);
-  border: 2.5px solid var(--edge);
-  border-radius: 24px;
-  transform: rotate(1.8deg);
-  z-index: 0;
-}
-
-.deck::after {
-  left: 6px;
-  right: 6px;
-  top: 14px;
-  bottom: -10px;
-  transform: rotate(-2.6deg);
-  z-index: 0;
-  opacity: 0.9;
+  display: none !important;
 }
 
 .cue {
@@ -788,9 +768,9 @@ button:hover .icon-3d,
 .cta {
   position: sticky;
   bottom: 0;
-  margin: 14px -18px -24px;
-  padding: 12px 18px 20px;
-  background: linear-gradient(to top, var(--bg) 80%, transparent);
+  margin: 12px 0 0;
+  padding: 8px 0 14px;
+  background: var(--bg);
   z-index: 10;
 }
 
@@ -1679,9 +1659,9 @@ button:hover .icon-3d,
 .foot-s {
   position: sticky;
   bottom: 0;
-  margin: 14px -18px -20px;
-  padding: 12px 18px 20px;
-  background: linear-gradient(to top, var(--sb, #ffffff) 85%, transparent);
+  margin: 12px 0 0;
+  padding: 8px 0 14px;
+  background: var(--sb, #ffffff);
   z-index: 10;
 }
 
