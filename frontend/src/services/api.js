@@ -1,9 +1,10 @@
 const API_BASE_URL =
-  import.meta.env.VITE_API_URL !== undefined
-    ? import.meta.env.VITE_API_URL
-    : (typeof window !== "undefined" && window.location.port === "5173"
-        ? "http://127.0.0.1:8000"
-        : "");
+  import.meta.env.VITE_API_URL ||
+  (typeof window !== "undefined" &&
+  (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") &&
+  window.location.port === "5173"
+    ? "http://127.0.0.1:8000"
+    : "https://speaking-app-nqdr.onrender.com");
 
 /**
  * Audio faylni Whisper STT orqali matnga aylantirish (/transcribe)
