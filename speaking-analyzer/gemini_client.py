@@ -22,8 +22,8 @@ DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash").strip()
 FALLBACK_MODELS = [
     DEFAULT_MODEL,
     "gemini-3.5-flash",
-    "gemini-3.5-flash-lite",
     "gemini-flash-latest",
+    "gemini-2.5-flash",
 ]
 # Remove duplicates while preserving order
 SEEN_MODELS = set()
@@ -123,7 +123,7 @@ def transcribe_audio_with_gemini(audio_path: str, mime_type: str = "") -> dict:
         with open(audio_path, "rb") as f:
             audio_bytes = f.read()
 
-        if len(audio_bytes) < 1000:
+        if len(audio_bytes) < 100:
             return {}
 
         b64_audio = base64.b64encode(audio_bytes).decode("utf-8")

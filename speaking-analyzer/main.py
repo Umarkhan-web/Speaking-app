@@ -88,12 +88,23 @@ async def transcribe(file: UploadFile = File(...)):
             temp.write(audio)
             temp_path = temp.name
 
-        # 1. Faster-whisper with VAD noise filter and accent-priming prompt
+        # Calculate real audio duration from file
+        real_duration = 0.0
+        try:
+            import wave
+            with wave.open(temp_path, "rb") as wf:
+                real_duration = round(wf.getnframes() / float(wf.getframerate()), 2)
+        except Exception:
+            sz = os.path.getsize(temp_path)
+            if sz > 44:
+                real_duration = round((sz - 44) / 32000.0, 2)
+
         segment_list = []
-        info_duration = 0.0
+        info_duration = real_duration
         info_lang = "en"
         avg_logprob = -0.3
 
+        # 1. Try Faster-whisper if available
         model = get_whisper()
         if model is not None:
             try:
@@ -106,8 +117,10 @@ async def transcribe(file: UploadFile = File(...)):
                     initial_prompt="IELTS Speaking candidate response. Spoken in English with potential Central Asian, Uzbek, or international accent. Recognize spoken words verbatim, proper punctuation.",
                 )
                 segment_list = list(segments)
-                info_duration = round(info.duration, 2)
-                info_lang = info.language
+                if info and info.duration:
+                    info_duration = round(info.duration, 2)
+                if info and info.language:
+                    info_lang = info.language
                 if segment_list:
                     avg_logprob = round(sum(s.avg_logprob for s in segment_list) / len(segment_list), 3)
             except Exception as w_err:
@@ -125,28 +138,30 @@ async def transcribe(file: UploadFile = File(...)):
 
         full_transcript = " ".join(item["text"] for item in subtitles).strip()
 
-        # 2. Intelligent Gemini Multimodal Audio Booster:
-        # If Whisper missed words due to heavy accent, background noise, or low logprob
-        if (len(full_transcript.split()) < 3 and info_duration > 2.5) or avg_logprob < -0.85:
+        # 2. Intelligent Gemini Multimodal Audio:
+        # If Whisper is unavailable, or transcribed 0 / few words (< 3 words), or low confidence
+        if not full_transcript or len(full_transcript.split()) < 3 or avg_logprob < -0.85:
             try:
                 from gemini_client import transcribe_audio_with_gemini
-                gemini_stt = transcribe_audio_with_gemini(temp_path)
+                content_type = file.content_type or ""
+                gemini_stt = transcribe_audio_with_gemini(temp_path, mime_type=content_type)
                 if gemini_stt and gemini_stt.get("transcript"):
                     gem_text = gemini_stt["transcript"].strip()
-                    if len(gem_text.split()) >= len(full_transcript.split()):
+                    if gem_text:
                         full_transcript = gem_text
+                        effective_dur = info_duration if info_duration > 0.5 else 10.0
                         gem_subs = gemini_stt.get("subtitles", [])
-                        if gem_subs and isinstance(gem_subs, list):
+                        if gem_subs and isinstance(gem_subs, list) and len(gem_subs) > 0:
                             subtitles = [
                                 {
                                     "start": float(s.get("start", 0.0)),
-                                    "end": float(s.get("end", info_duration)),
+                                    "end": float(s.get("end", effective_dur)),
                                     "text": str(s.get("text", "")).strip(),
                                 }
                                 for s in gem_subs if str(s.get("text", "")).strip()
                             ]
                         else:
-                            subtitles = [{"start": 0.0, "end": info_duration, "text": full_transcript}]
+                            subtitles = [{"start": 0.0, "end": effective_dur, "text": full_transcript}]
                         avg_logprob = -0.2
                         print(f"[STT Boost] Gemini Multimodal Audio orqali {len(full_transcript.split())} ta so'z olindi!")
             except Exception as g_err:

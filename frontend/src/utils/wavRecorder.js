@@ -60,9 +60,12 @@ export class AudioRecorder {
     this.audioCtx = null;
     this.source = null;
     this.processor = null;
+    this.gainNode = null;
     this.analyser = null;
     this.recordedChunks = [];
     this.sampleRate = 16000;
+    this.mediaRecorder = null;
+    this.mediaChunks = [];
   }
 
   async start() {
@@ -83,6 +86,11 @@ export class AudioRecorder {
     }
     this.sampleRate = this.audioCtx.sampleRate || 44100;
 
+    // Mobil Safari/Telegram WebApp uchun juda muhim: AudioContext-ni uyg'otish
+    if (this.audioCtx.state === "suspended") {
+      await this.audioCtx.resume();
+    }
+
     this.source = this.audioCtx.createMediaStreamSource(this.stream);
     this.analyser = this.audioCtx.createAnalyser();
     this.analyser.fftSize = 64;
@@ -97,8 +105,32 @@ export class AudioRecorder {
       this.recordedChunks.push(new Float32Array(input));
     };
 
+    // Mobil qurilmalarda ekranni jim qilib, yozish jarayonini aktiv ushlab turish uchun zero-gain
+    this.gainNode = this.audioCtx.createGain();
+    this.gainNode.gain.value = 0;
     this.source.connect(this.processor);
-    this.processor.connect(this.audioCtx.destination);
+    this.processor.connect(this.gainNode);
+    this.gainNode.connect(this.audioCtx.destination);
+
+    // Mobil telefonlar (iOS Safari/Android) uchun parallel MediaRecorder xavfsizlik tarmog'i
+    this.mediaChunks = [];
+    this.mediaRecorder = null;
+    if (typeof MediaRecorder !== "undefined") {
+      try {
+        const types = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/aac", ""];
+        const supportedType = types.find((t) => !t || MediaRecorder.isTypeSupported(t));
+        const options = supportedType ? { mimeType: supportedType } : undefined;
+        this.mediaRecorder = new MediaRecorder(this.stream, options);
+        this.mediaRecorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) {
+            this.mediaChunks.push(e.data);
+          }
+        };
+        this.mediaRecorder.start(200);
+      } catch (err) {
+        console.warn("MediaRecorder parallel init skipped:", err);
+      }
+    }
   }
 
   getAudioLevel() {
@@ -113,12 +145,25 @@ export class AudioRecorder {
   }
 
   stop() {
+    if (this.mediaRecorder && this.mediaRecorder.state !== "inactive") {
+      try {
+        this.mediaRecorder.stop();
+      } catch {}
+    }
+
     if (this.processor) {
       try {
         this.processor.disconnect();
       } catch {}
       this.processor.onaudioprocess = null;
       this.processor = null;
+    }
+
+    if (this.gainNode) {
+      try {
+        this.gainNode.disconnect();
+      } catch {}
+      this.gainNode = null;
     }
 
     if (this.source) {
@@ -158,6 +203,26 @@ export class AudioRecorder {
         finalSamples[i] = samples[srcIdx] || 0;
       }
       targetRate = 16000;
+    }
+
+    // Ovoz signali borligini tekshirish
+    let hasSignal = false;
+    for (let i = 0; i < samples.length; i += 8) {
+      if (Math.abs(samples[i]) > 0.005) {
+        hasSignal = true;
+        break;
+      }
+    }
+
+    // Agar Web Audio PCM signali to'liq yozilgan bo'lsa, toza 16kHz WAV qaytaramiz
+    if (samples.length > 1600 && hasSignal) {
+      return encodeWav(finalSamples, targetRate);
+    }
+
+    // Agar Web Audio PCM bo'sh bo'lsa (iOS WebKit himoyasi sabab), MediaRecorder Blob qaytaramiz
+    if (this.mediaChunks && this.mediaChunks.length > 0) {
+      const mime = this.mediaRecorder?.mimeType || "audio/webm";
+      return new Blob(this.mediaChunks, { type: mime });
     }
 
     return encodeWav(finalSamples, targetRate);
