@@ -8,6 +8,9 @@ from pathlib import Path
 import tempfile
 import os
 import re
+import threading
+import time
+import requests as http_requests
 
 from analyzer import (
     detect_rule_grammar_errors,
@@ -26,6 +29,30 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ──────────────────────────────────────────────────────────────────
+# Keep-alive: Render free tier uchun har 10 daqiqada o'z-o'ziga ping
+# Bu server uxlab qolmasligini ta'minlaydi (15 daqiqa inactivity = sleep)
+# ──────────────────────────────────────────────────────────────────
+RENDER_URL = os.getenv("RENDER_EXTERNAL_URL", "").strip()
+
+def _keepalive_loop():
+    """Har 10 daqiqada o'z-o'ziga GET /api/health so'rovi yuboradi."""
+    time.sleep(60)  # Serverning to'liq ishga tushishini kutish
+    while True:
+        try:
+            if RENDER_URL:
+                url = f"{RENDER_URL.rstrip('/')}/api/health"
+            else:
+                url = "http://localhost:8000/api/health"
+            r = http_requests.get(url, timeout=10)
+            print(f"[KeepAlive] Ping: {url} -> {r.status_code}")
+        except Exception as e:
+            print(f"[KeepAlive] Ping xatosi: {e}")
+        time.sleep(600)  # 10 daqiqa
+
+_keepalive_thread = threading.Thread(target=_keepalive_loop, daemon=True)
+_keepalive_thread.start()
 
 whisper_model = None
 
@@ -54,7 +81,13 @@ class GenerateTopicRequest(BaseModel):
 
 @app.get("/api/health")
 def api_health():
-    return {"message": "AI Speaking Analyzer ishlayapti!"}
+    return {"message": "AI Speaking Analyzer ishlayapti!", "status": "ok"}
+
+
+@app.get("/ping")
+def ping():
+    """Keep-alive endpoint - Render free tier uchun"""
+    return {"pong": True}
 
 
 @app.get("/api/topics")
