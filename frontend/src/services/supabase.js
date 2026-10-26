@@ -34,13 +34,11 @@ export async function signInWithGoogle() {
     );
   }
 
-  const isTelegram = Boolean(window.Telegram?.WebApp?.initData);
-
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
       redirectTo: window.location.origin,
-      skipBrowserRedirect: isTelegram,
+      skipBrowserRedirect: true,
       queryParams: {
         access_type: "offline",
         prompt: "consent",
@@ -50,8 +48,9 @@ export async function signInWithGoogle() {
 
   if (error) throw error;
 
-  if (isTelegram && data?.url) {
-    if (window.Telegram?.WebApp?.openLink) {
+  if (data?.url) {
+    const isTelegram = Boolean(window.Telegram?.WebApp);
+    if (isTelegram && window.Telegram?.WebApp?.openLink) {
       window.Telegram.WebApp.openLink(data.url);
     } else {
       window.location.href = data.url;

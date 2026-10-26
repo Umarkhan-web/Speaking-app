@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Icon3D } from "./Icon3D";
+import { buzz } from "../utils/audio";
 import {
   signInWithGoogle,
   signInWithEmail,
@@ -195,6 +196,27 @@ export function AuthScreen({ onAuthSuccess, onToast }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGuestLogin = () => {
+    buzz(10, true);
+    const guestId =
+      localStorage.getItem("birdan.guest_id") ||
+      "guest_" + Math.random().toString(36).substring(2, 9);
+    localStorage.setItem("birdan.guest_id", guestId);
+    localStorage.setItem("birdan.is_guest", "true");
+
+    const guestUser = {
+      id: guestId,
+      email: "mehmon@birdan.app",
+      user_metadata: {
+        full_name: "Mehmon",
+        is_guest: true,
+      },
+    };
+
+    if (onToast) onToast("Mehmon rejimi faollashdi! Xush kelibsiz! 👋");
+    if (onAuthSuccess) onAuthSuccess(guestUser);
   };
 
   return (
@@ -813,6 +835,73 @@ export function AuthScreen({ onAuthSuccess, onToast }) {
                   : "Tizimga kirish 🚀"}
               </button>
             </form>
+
+            {/* Divider */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                margin: "18px 0 12px",
+                color: "var(--muted)",
+                fontSize: "12px",
+                fontWeight: "600",
+              }}
+            >
+              <div
+                style={{
+                  flex: 1,
+                  height: "1.5px",
+                  background: "var(--edge)",
+                  opacity: 0.25,
+                }}
+              />
+              <span>yoki</span>
+              <div
+                style={{
+                  flex: 1,
+                  height: "1.5px",
+                  background: "var(--edge)",
+                  opacity: 0.25,
+                }}
+              />
+            </div>
+
+            {/* Mehmon sifatida kirish (Akkaunt ochmasdan) */}
+            <button
+              type="button"
+              onClick={handleGuestLogin}
+              style={{
+                width: "100%",
+                padding: "12px 14px",
+                background: "rgba(0, 0, 0, 0.04)",
+                color: "var(--fg)",
+                border: "2px dashed var(--edge)",
+                borderRadius: "14px",
+                fontSize: "14.5px",
+                fontWeight: "800",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+                transition: "all 0.15s ease",
+              }}
+            >
+              <span>Akkauntsiz kirish (Mehmon)</span>
+              <span style={{ fontSize: "16px" }}>👤</span>
+            </button>
+            <p
+              style={{
+                margin: "6px 0 0",
+                fontSize: "12px",
+                textAlign: "center",
+                color: "var(--muted)",
+                fontWeight: "500",
+              }}
+            >
+              Ro‘yxatdan o‘tmasdan to‘g‘ridan-to‘g‘ri sinab ko‘ring
+            </p>
           </div>
         )}
       </div>

@@ -115,7 +115,9 @@ export function Profile({
         style={{
           margin: "14px 0",
           padding: "16px",
-          background: "linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(16, 185, 129, 0.08))",
+          background: user?.user_metadata?.is_guest
+            ? "linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(239, 68, 68, 0.08))"
+            : "linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(16, 185, 129, 0.08))",
           borderRadius: "16px",
           border: "2px solid var(--fg)",
           boxShadow: "3px 3px 0px var(--fg)",
@@ -123,42 +125,65 @@ export function Profile({
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ fontSize: "1.2rem" }}>☁️</span>
-            <b>Shaxsiy Bulut Hisobi</b>
+            <span style={{ fontSize: "1.2rem" }}>{user?.user_metadata?.is_guest ? "👤" : "☁️"}</span>
+            <b>{user?.user_metadata?.is_guest ? "Mehmon hisobi" : "Shaxsiy Bulut Hisobi"}</b>
           </div>
           <span
             style={{
-              background: "#dcfce7",
-              color: "#166534",
+              background: user?.user_metadata?.is_guest ? "#fef3c7" : "#dcfce7",
+              color: user?.user_metadata?.is_guest ? "#92400e" : "#166534",
               fontSize: "0.75rem",
               fontWeight: "bold",
               padding: "3px 8px",
               borderRadius: "20px",
             }}
           >
-            Faol
+            {user?.user_metadata?.is_guest ? "Mehmon" : "Faol"}
           </span>
         </div>
         <p style={{ margin: "4px 0 12px 0", fontSize: "0.85rem", opacity: 0.85 }}>
-          Uланган: <b>{user?.email}</b>
+          {user?.user_metadata?.is_guest ? (
+            <span>Natijalarni bulutda saqlash va sinxronlash uchun to‘liq akkaunt oching.</span>
+          ) : (
+            <span>Ulangan: <b>{user?.email}</b></span>
+          )}
         </p>
         <div style={{ display: "flex", gap: "8px" }}>
-          <button
-            type="button"
-            onClick={onSignOut}
-            style={{
-              padding: "8px 14px",
-              background: "#fff",
-              color: "#111",
-              border: "1.5px solid #111",
-              borderRadius: "8px",
-              fontSize: "0.84rem",
-              fontWeight: "600",
-              cursor: "pointer",
-            }}
-          >
-            Chiqish
-          </button>
+          {user?.user_metadata?.is_guest ? (
+            <button
+              type="button"
+              onClick={onSignOut}
+              style={{
+                padding: "8px 14px",
+                background: "var(--tang, #ff5722)",
+                color: "#fff",
+                border: "1.5px solid var(--fg)",
+                borderRadius: "8px",
+                fontSize: "0.84rem",
+                fontWeight: "700",
+                cursor: "pointer",
+              }}
+            >
+              Akkaunt ochish 🚀
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onSignOut}
+              style={{
+                padding: "8px 14px",
+                background: "#fff",
+                color: "#111",
+                border: "1.5px solid #111",
+                borderRadius: "8px",
+                fontSize: "0.84rem",
+                fontWeight: "600",
+                cursor: "pointer",
+              }}
+            >
+              Chiqish
+            </button>
+          )}
         </div>
       </div>
 

@@ -153,6 +153,13 @@ export function App() {
               });
             }
           });
+        } else if (localStorage.getItem("birdan.is_guest") === "true") {
+          const guestId = localStorage.getItem("birdan.guest_id") || "guest_default";
+          setUser({
+            id: guestId,
+            email: "mehmon@birdan.app",
+            user_metadata: { full_name: "Mehmon", is_guest: true },
+          });
         }
       })
       .finally(() => {
@@ -187,11 +194,16 @@ export function App() {
 
   const handleSignOut = async () => {
     try {
+      localStorage.removeItem("birdan.is_guest");
+      localStorage.removeItem("birdan.guest_id");
       await signOut();
       setUser(null);
       showToast("Tizimdan chiqildi.");
     } catch {
-      showToast("Chiqishda xatolik yuz berdi", true);
+      localStorage.removeItem("birdan.is_guest");
+      localStorage.removeItem("birdan.guest_id");
+      setUser(null);
+      showToast("Tizimdan chiqildi.");
     }
   };
 
