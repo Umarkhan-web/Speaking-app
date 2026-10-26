@@ -459,7 +459,27 @@ button:hover .icon-3d,
 
 .deck::before,
 .deck::after {
-  display: none !important;
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 10px;
+  bottom: -6px;
+  background: var(--paper);
+  border: 2.5px solid var(--edge);
+  border-radius: 24px;
+  transform: rotate(1.8deg);
+  z-index: 0;
+}
+
+.deck::after {
+  left: 6px;
+  right: 6px;
+  top: 14px;
+  bottom: -10px;
+  transform: rotate(-2.6deg);
+  z-index: 0;
+  opacity: 0.9;
 }
 
 .cue {
@@ -766,12 +786,11 @@ button:hover .icon-3d,
 }
 
 .cta {
-  position: sticky;
-  bottom: 0;
-  margin: 12px 0 0;
-  padding: 8px 0 14px;
-  background: var(--bg);
-  z-index: 10;
+  position: relative;
+  margin: 14px 0 0;
+  padding: 0;
+  background: transparent;
+  z-index: 2;
 }
 
 .btn {
@@ -1657,59 +1676,11 @@ button:hover .icon-3d,
 }
 
 .foot-s {
-  position: sticky;
-  bottom: 0;
-  margin: 12px 0 0;
-  padding: 8px 0 14px;
-  background: var(--sb, #ffffff);
-  z-index: 10;
-}
-
-/* Compact Sentence Starter Helpers */
-.hlp-compact {
-  margin: 10px 0;
-  padding: 10px 12px;
-  background: var(--card, #ffffff);
-  border: 2px solid var(--edge);
-  border-radius: 16px;
-  box-shadow: 0 3px 0 var(--edge);
-}
-
-.hlp-label {
-  font-size: 12px;
-  font-weight: 800;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 8px;
-}
-
-.hlp-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.ph-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 10px;
-  background: var(--butter, #FFE45E);
-  border: 1.5px solid var(--edge);
-  border-radius: 999px;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  color: #0B1040;
-  cursor: pointer;
-  box-shadow: 0 2px 0 var(--edge);
-  transition: transform 0.1s, box-shadow 0.1s;
-  user-select: none;
-}
-
-.ph-chip:active {
-  transform: translateY(2px);
-  box-shadow: 0 0 0 var(--edge);
+  position: relative;
+  margin: 14px 0 0;
+  padding: 0;
+  background: transparent;
+  z-index: 3;
 }
 
 .bigbtn {
