@@ -786,11 +786,12 @@ button:hover .icon-3d,
 }
 
 .cta {
-  position: relative;
-  margin: 14px 0 0;
-  padding: 0;
-  background: transparent;
-  z-index: 2;
+  position: sticky;
+  bottom: 0;
+  margin: 14px -18px -24px;
+  padding: 12px 18px 20px;
+  background: linear-gradient(to top, var(--bg) 80%, transparent);
+  z-index: 10;
 }
 
 .btn {
@@ -1676,11 +1677,59 @@ button:hover .icon-3d,
 }
 
 .foot-s {
-  position: relative;
-  margin: 14px 0 0;
-  padding: 0;
-  background: transparent;
-  z-index: 3;
+  position: sticky;
+  bottom: 0;
+  margin: 14px -18px -20px;
+  padding: 12px 18px 20px;
+  background: linear-gradient(to top, var(--sb, #ffffff) 85%, transparent);
+  z-index: 10;
+}
+
+/* Compact Sentence Starter Helpers */
+.hlp-compact {
+  margin: 10px 0;
+  padding: 10px 12px;
+  background: var(--card, #ffffff);
+  border: 2px solid var(--edge);
+  border-radius: 16px;
+  box-shadow: 0 3px 0 var(--edge);
+}
+
+.hlp-label {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.hlp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ph-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  background: var(--butter, #FFE45E);
+  border: 1.5px solid var(--edge);
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0B1040;
+  cursor: pointer;
+  box-shadow: 0 2px 0 var(--edge);
+  transition: transform 0.1s, box-shadow 0.1s;
+  user-select: none;
+}
+
+.ph-chip:active {
+  transform: translateY(2px);
+  box-shadow: 0 0 0 var(--edge);
 }
 
 .bigbtn {
