@@ -131,22 +131,25 @@ def transcribe_audio_with_gemini(audio_path: str, mime_type: str = "") -> dict:
         b64_audio = base64.b64encode(audio_bytes).decode("utf-8")
 
         prompt = (
-            "You are an expert Cambridge IELTS Audio Transcriber. "
-            "Listen to this audio file carefully. "
-            "Task: Transcribe the candidate's spoken English verbatim with 100% accuracy. "
-            "CRITICAL INSTRUCTIONS: "
-            "1. The candidate may speak with an Uzbek, Central Asian, or non-native accent, "
-            "   and there might be background hiss, room noise, or pauses. "
-            "   Accurately recognize the intended English words (e.g. understand 'samting' as 'something', "
-            "   'vork' as 'work', etc.) without dropping words. "
-            "2. Filter out non-speech noises (breathing, mic pops, clicks). "
-            "3. Format with proper English punctuation and sentence capitalization. "
-            "4. Split the speech into natural timestamped sentence segments if possible. "
-            "Return JSON strictly conforming to this schema:\n"
+            "You are an expert Cambridge IELTS Audio Transcriber and Multilingual Speech Recognition AI.\n"
+            "Listen to this audio file with extreme care.\n"
+            "Task: Transcribe the candidate's speech verbatim with 100% precision.\n\n"
+            "CRITICAL INSTRUCTIONS:\n"
+            "1. CODE-SWITCHING & MIXED UZBEK-ENGLISH: The candidate is an Uzbek student. They often start speaking in Uzbek "
+            "(e.g., 'Xo‘sh', 'Demak', 'Menimcha', 'Aytmoqchimanki', 'Bugun mavzu...', 'Masalan', 'Shu haqida gapirmoqchiman') "
+            "and then switch to English, or use Uzbek words when thinking. TRANSCRIBE ALL WORDS VERBATIM (both Uzbek and English). "
+            "Never hallucinate random English words for spoken Uzbek words! Recognize both languages cleanly.\n"
+            "2. WHISPERING & SOFT SPEECH: The candidate may whisper, murmur, speak softly, or hesitate. "
+            "Listen closely to low-amplitude audio and whispers. Do not skip quiet words.\n"
+            "3. NOISE & BACKGROUND DISTORTION: Filter out room echo, background noise, microphone static, or breathing sounds. "
+            "Focus cleanly on the speaker's vocal track.\n"
+            "4. NON-NATIVE PHONETICS: Accurately understand Uzbek-accented English (e.g. 'v' pronounced as 'w', 'samting' as 'something', 'peopl' as 'people') "
+            "and transcribe the intended words accurately with proper punctuation.\n\n"
+            "Return JSON conforming strictly to this format:\n"
             "{\n"
-            '  "transcript": "Full verbatim transcript",\n'
+            '  "transcript": "Full verbatim transcript capturing both English and any Uzbek words spoken",\n'
             '  "subtitles": [\n'
-            '    {"start": 0.0, "end": 4.5, "text": "First sentence..."}\n'
+            '    {"start": 0.0, "end": 3.5, "text": "Sentence segment..."}\n'
             "  ]\n"
             "}"
         )
@@ -225,10 +228,10 @@ def query_gemini_analysis(transcript: str) -> dict:
 "{transcript.strip()}"
 
 Perform a comprehensive IELTS Speaking evaluation:
-1. Detect any grammatical mistakes, tense errors, subject-verb disagreements, or wrong prepositions. For each error:
-   - "original": the exact wrong snippet from the candidate's speech
-   - "correction": the grammatically accurate English version
-   - "explanation": clear, educational rule explanation in UZBEK explaining why it was wrong and the grammar rule.
+1. Detect any grammatical mistakes, tense errors, subject-verb disagreements, wrong prepositions, or Uzbek code-switching words (e.g. if candidate used 'xo‘sh', 'demak', 'aytmoqchiman'). For each error:
+   - "original": the exact wrong snippet or Uzbek word used
+   - "correction": the grammatically accurate English version or appropriate English discourse marker (e.g. "Well", "Actually", "In other words")
+   - "explanation": clear, educational explanation in UZBEK explaining the rule and how to express it naturally in IELTS.
 2. Provide a Band 8.5+ rewritten version of this speech ("improved_answer") in natural native English, keeping the candidate's original ideas but expressing them eloquently with varied sentence structures.
 3. Suggest 3 to 4 advanced C1/C2 vocabulary replacements ("vocabulary_suggestions") tailored directly to words or expressions used in this speech:
    - "original": the exact simple word or expression used by the student (e.g. "good", "a lot of", "like", "make", "important")

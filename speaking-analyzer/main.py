@@ -153,68 +153,69 @@ async def transcribe(file: UploadFile = File(...)):
         info_lang = "en"
         avg_logprob = -0.3
 
-        # 1. Try Faster-whisper if available
-        model = get_whisper()
-        if model is not None:
-            try:
-                segments, info = model.transcribe(
-                    temp_path,
-                    language="en",
-                    beam_size=5,
-                    vad_filter=True,
-                    vad_parameters=dict(min_silence_duration_ms=300, speech_pad_ms=200),
-                    initial_prompt="IELTS Speaking candidate response. Spoken in English with potential Central Asian, Uzbek, or international accent. Recognize spoken words verbatim, proper punctuation.",
-                )
-                segment_list = list(segments)
-                if info and info.duration:
-                    info_duration = round(info.duration, 2)
-                if info and info.language:
-                    info_lang = info.language
-                if segment_list:
-                    avg_logprob = round(sum(s.avg_logprob for s in segment_list) / len(segment_list), 3)
-            except Exception as w_err:
-                print("[Whisper] STT xatolik (Gemini Audio ishlatiladi):", w_err)
+        # 1. PRIMARY STT: Gemini Multimodal Audio
+        # Extremely robust against whispering, soft speech, background noise, and Uzbek-English code-switching
+        gemini_success = False
+        try:
+            from gemini_client import transcribe_audio_with_gemini
+            content_type = file.content_type or ""
+            gemini_stt = transcribe_audio_with_gemini(temp_path, mime_type=content_type)
+            if gemini_stt and gemini_stt.get("transcript"):
+                gem_text = gemini_stt["transcript"].strip()
+                if gem_text and len(gem_text.split()) >= 1:
+                    full_transcript = gem_text
+                    effective_dur = info_duration if info_duration > 0.5 else 10.0
+                    gem_subs = gemini_stt.get("subtitles", [])
+                    if gem_subs and isinstance(gem_subs, list) and len(gem_subs) > 0:
+                        subtitles = [
+                            {
+                                "start": float(s.get("start", 0.0)),
+                                "end": float(s.get("end", effective_dur)),
+                                "text": str(s.get("text", "")).strip(),
+                            }
+                            for s in gem_subs if str(s.get("text", "")).strip()
+                        ]
+                    else:
+                        subtitles = [{"start": 0.0, "end": effective_dur, "text": full_transcript}]
+                    avg_logprob = -0.15
+                    gemini_success = True
+                    print(f"[STT Primary] Gemini Multimodal Audio orqali {len(full_transcript.split())} ta so'z olindi (pichirlash va aralash tillar tushunildi)!")
+        except Exception as g_err:
+            print("[Gemini Audio Transcribe] Xatolik (Whisper zaxirasi ishlatiladi):", g_err)
 
-        subtitles = [
-            {
-                "start": round(segment.start, 2),
-                "end": round(segment.end, 2),
-                "text": segment.text.strip(),
-            }
-            for segment in segment_list
-            if segment.text.strip()
-        ]
-
-        full_transcript = " ".join(item["text"] for item in subtitles).strip()
-
-        # 2. Intelligent Gemini Multimodal Audio:
-        # If Whisper is unavailable, or transcribed 0 / few words (< 3 words), or low confidence
-        if not full_transcript or len(full_transcript.split()) < 3 or avg_logprob < -0.85:
-            try:
-                from gemini_client import transcribe_audio_with_gemini
-                content_type = file.content_type or ""
-                gemini_stt = transcribe_audio_with_gemini(temp_path, mime_type=content_type)
-                if gemini_stt and gemini_stt.get("transcript"):
-                    gem_text = gemini_stt["transcript"].strip()
-                    if gem_text:
-                        full_transcript = gem_text
-                        effective_dur = info_duration if info_duration > 0.5 else 10.0
-                        gem_subs = gemini_stt.get("subtitles", [])
-                        if gem_subs and isinstance(gem_subs, list) and len(gem_subs) > 0:
-                            subtitles = [
-                                {
-                                    "start": float(s.get("start", 0.0)),
-                                    "end": float(s.get("end", effective_dur)),
-                                    "text": str(s.get("text", "")).strip(),
-                                }
-                                for s in gem_subs if str(s.get("text", "")).strip()
-                            ]
-                        else:
-                            subtitles = [{"start": 0.0, "end": effective_dur, "text": full_transcript}]
-                        avg_logprob = -0.2
-                        print(f"[STT Boost] Gemini Multimodal Audio orqali {len(full_transcript.split())} ta so'z olindi!")
-            except Exception as g_err:
-                print("[Gemini Audio Transcribe] Xatolik:", g_err)
+        # 2. FALLBACK STT: Faster-whisper (if Gemini was unavailable or returned empty)
+        if not gemini_success:
+            model = get_whisper()
+            if model is not None:
+                try:
+                    # vad_filter=False to prevent cutting off quiet whispers and soft speech
+                    segments, info = model.transcribe(
+                        temp_path,
+                        language=None, # Auto-detect multilingual speech (Uzbek + English)
+                        beam_size=5,
+                        vad_filter=False,
+                        initial_prompt="IELTS Speaking candidate. Candidate may whisper, speak softly, or switch between Uzbek and English. Transcribe speech accurately verbatim.",
+                    )
+                    segment_list = list(segments)
+                    if info and info.duration:
+                        info_duration = round(info.duration, 2)
+                    if info and info.language:
+                        info_lang = info.language
+                    if segment_list:
+                        avg_logprob = round(sum(s.avg_logprob for s in segment_list) / len(segment_list), 3)
+                        subtitles = [
+                            {
+                                "start": round(segment.start, 2),
+                                "end": round(segment.end, 2),
+                                "text": segment.text.strip(),
+                            }
+                            for segment in segment_list
+                            if segment.text.strip()
+                        ]
+                        full_transcript = " ".join(item["text"] for item in subtitles).strip()
+                        print(f"[STT Fallback] Whisper orqali {len(full_transcript.split())} ta so'z olindi.")
+                except Exception as w_err:
+                    print("[Whisper] Zaxira STT xatolik:", w_err)
 
         print(f"\n[STT] Audio: {info_duration:.1f}s | So'zlar soni: {len(full_transcript.split())}")
         print(f"[STT] Matn: \"{full_transcript}\" | Logprob: {avg_logprob}")
