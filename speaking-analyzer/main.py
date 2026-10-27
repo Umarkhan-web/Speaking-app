@@ -149,6 +149,8 @@ async def transcribe(file: UploadFile = File(...)):
                 real_duration = round((sz - 44) / 32000.0, 2)
 
         segment_list = []
+        full_transcript = ""
+        subtitles = []
         info_duration = real_duration
         info_lang = "en"
         avg_logprob = -0.3
@@ -216,6 +218,11 @@ async def transcribe(file: UploadFile = File(...)):
                         print(f"[STT Fallback] Whisper orqali {len(full_transcript.split())} ta so'z olindi.")
                 except Exception as w_err:
                     print("[Whisper] Zaxira STT xatolik:", w_err)
+
+        if not full_transcript and subtitles:
+            full_transcript = " ".join(item["text"] for item in subtitles).strip()
+        if not subtitles and full_transcript:
+            subtitles = [{"start": 0.0, "end": max(1.0, info_duration), "text": full_transcript}]
 
         print(f"\n[STT] Audio: {info_duration:.1f}s | So'zlar soni: {len(full_transcript.split())}")
         print(f"[STT] Matn: \"{full_transcript}\" | Logprob: {avg_logprob}")
