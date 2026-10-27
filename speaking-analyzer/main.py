@@ -54,6 +54,22 @@ def _keepalive_loop():
 _keepalive_thread = threading.Thread(target=_keepalive_loop, daemon=True)
 _keepalive_thread.start()
 
+# ──────────────────────────────────────────────────────────────────
+# 24/7 Cloud Telegram Bot Service (Render orqali mustaqil ishlaydi)
+# Kompyuter o'chiq bo'lsa ham bot to'xtovsiz ishlaydi!
+# ──────────────────────────────────────────────────────────────────
+def _start_bot_thread():
+    time.sleep(5)  # Serverning portni band qilishini kutish
+    try:
+        from bot_service import run_bot
+        print("[TelegramBot] Render serverida 24/7 Telegram bot ishga tushmoqda...")
+        run_bot()
+    except Exception as e:
+        print(f"[TelegramBot] Xatolik yuz berdi: {e}")
+
+_bot_thread = threading.Thread(target=_start_bot_thread, daemon=True)
+_bot_thread.start()
+
 whisper_model = None
 
 def get_whisper():

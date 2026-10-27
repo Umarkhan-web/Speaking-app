@@ -1,8 +1,12 @@
 import asyncio
+import io
 import logging
 import os
 import sys
+import time
+from datetime import datetime
 from pathlib import Path
+import aiohttp
 from dotenv import load_dotenv
 
 # Windows konsolida UTF-8 xatoliklarini oldini olish
@@ -13,6 +17,8 @@ if hasattr(sys.stderr, "reconfigure"):
 
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import CommandStart, Command
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
     InlineKeyboardMarkup,
     InlineKeyboardButton,
@@ -20,7 +26,10 @@ from aiogram.types import (
     KeyboardButton,
     WebAppInfo,
     MenuButtonWebApp,
+    BufferedInputFile,
 )
+
+from db import init_db, upsert_user, get_stats, get_all_user_ids, get_latest_users, log_broadcast
 
 # .env faylini yuklash
 env_path = Path(__file__).resolve().parent / ".env"
@@ -28,6 +37,10 @@ load_dotenv(dotenv_path=env_path)
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 WEBAPP_URL = os.getenv("WEBAPP_URL", "").strip()
+ADMIN_ID = int(os.getenv("ADMIN_ID", "6094022048").strip())
+RENDER_BACKEND_URL = os.getenv("RENDER_BACKEND_URL", "https://speaking-app-nqdr.onrender.com").strip()
+
+BOT_START_TIME = time.time()
 
 logging.basicConfig(
     level=logging.INFO,
@@ -35,6 +48,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger("telegram_webapp_bot")
 
+dp = Dispatcher()
+
+# Broadcast uchun FSM holati
+class BroadcastState(StatesGroup):
+    waiting_for_message = State()
+
+def is_admin(user_id: int) -> bool:
+    return user_id == ADMIN_ID
 
 def build_inline_keyboard(url: str) -> InlineKeyboardMarkup:
     """Web App ochuvchi inline tugma"""
@@ -55,32 +76,86 @@ def build_inline_keyboard(url: str) -> InlineKeyboardMarkup:
         ]
     )
 
+def build_reply_keyboard(url: str, user_id: int) -> ReplyKeyboardMarkup:
+    """Pastdagi doimiy klaviatura (Adminga maxsus Admin Panel tugmasi bilan)"""
+    keyboard = [
+        [
+            KeyboardButton(
+                text="🚀 Ilovani ochish",
+                web_app=WebAppInfo(url=url),
+            )
+        ]
+    ]
+    if is_admin(user_id):
+        keyboard.append([KeyboardButton(text="👑 Admin Panel")])
 
-def build_reply_keyboard(url: str) -> ReplyKeyboardMarkup:
-    """Pastdagi doimiy Web App tugmasi"""
     return ReplyKeyboardMarkup(
-        keyboard=[
-            [
-                KeyboardButton(
-                    text="🚀 Ilovani ochish",
-                    web_app=WebAppInfo(url=url),
-                )
-            ]
-        ],
+        keyboard=keyboard,
         resize_keyboard=True,
         persistent=True,
     )
 
+def build_admin_keyboard() -> InlineKeyboardMarkup:
+    """Admin panel boshqaruv tugmalari"""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="📊 Batafsil Statistika", callback_data="admin_stats"),
+                InlineKeyboardButton(text="📢 Xabarnoma (Broadcast)", callback_data="admin_broadcast"),
+            ],
+            [
+                InlineKeyboardButton(text="👥 Oxirgi A'zolar", callback_data="admin_users"),
+                InlineKeyboardButton(text="🌐 Serverlar Holati", callback_data="admin_servers"),
+            ],
+            [
+                InlineKeyboardButton(text="📥 Foydalanuvchilar (CSV)", callback_data="admin_export"),
+                InlineKeyboardButton(text="🔄 Yangilash", callback_data="admin_refresh"),
+            ],
+            [
+                InlineKeyboardButton(text="🚀 Ilovaga O'tish", web_app=WebAppInfo(url=WEBAPP_URL)),
+            ]
+        ]
+    )
 
-dp = Dispatcher()
+def format_uptime() -> str:
+    elapsed = int(time.time() - BOT_START_TIME)
+    days, rem = divmod(elapsed, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes, seconds = divmod(rem, 60)
+    if days > 0:
+        return f"{days} kun, {hours} soat, {minutes} daq"
+    elif hours > 0:
+        return f"{hours} soat, {minutes} daq"
+    return f"{minutes} daqiqa, {seconds} soniya"
+
+async def check_url_health(url: str, timeout_sec: int = 4) -> tuple[bool, int, float]:
+    """Sayt yoki server holatini tekshirish (status, javob vaqti ms)"""
+    start_t = time.time()
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=timeout_sec)) as resp:
+                latency = round((time.time() - start_t) * 1000, 1)
+                return (resp.status == 200, resp.status, latency)
+    except Exception:
+        latency = round((time.time() - start_t) * 1000, 1)
+        return (False, 0, latency)
 
 
 @dp.message(CommandStart())
 async def handle_start(message: types.Message, bot: Bot):
     """Foydalanuvchi /start bosganda ishlaydi"""
-    user_name = message.from_user.first_name if message.from_user else "Foydalanuvchi"
+    user = message.from_user
+    if user:
+        upsert_user(
+            user_id=user.id,
+            username=user.username or "",
+            first_name=user.first_name or "",
+            last_name=user.last_name or ""
+        )
 
-    # Telegram chat menyu tugmasini (pastki chap burchak) WebApp qilib sozlash
+    user_name = user.first_name if user else "Foydalanuvchi"
+
+    # Telegram chat menyu tugmasini WebApp qilib sozlash
     try:
         await bot.set_chat_menu_button(
             chat_id=message.chat.id,
@@ -106,17 +181,242 @@ async def handle_start(message: types.Message, bot: Bot):
         reply_markup=build_inline_keyboard(WEBAPP_URL),
     )
 
-    # Shuningdek, pastki klaviaturada ham tugma chiqaramiz
+    hint_text = (
+        "💡 <i>Eslatma: Xabar yozish maydonining yonidagi 'Ilova' menyusi yoki pastdagi tugma orqali istalgan vaqt ilovani ochishingiz mumkin.</i>"
+    )
+    if user and is_admin(user.id):
+        hint_text += "\n\n👑 <b>Salom Administrator!</b> Siz uchun pastki klaviaturada <b>Admin Panel</b> tugmasi biriktirildi."
+
     await message.answer(
-        "💡 <i>Eslatma: Xabar yozish maydonining yonidagi 'Ilova' menyusi yoki pastdagi tugma orqali istalgan vaqt ilovani ochishingiz mumkin.</i>",
+        hint_text,
         parse_mode="HTML",
-        reply_markup=build_reply_keyboard(WEBAPP_URL),
+        reply_markup=build_reply_keyboard(WEBAPP_URL, user.id if user else 0),
     )
 
 
+# ===================== ADMIN PANEL =====================
+
+@dp.message(F.text == "👑 Admin Panel")
+@dp.message(Command("admin"))
+async def handle_admin_panel(message: types.Message):
+    if not message.from_user or not is_admin(message.from_user.id):
+        await message.answer("⛔ <b>Kechirasiz, bu bo'lim faqat bot administratori uchun!</b>", parse_mode="HTML")
+        return
+
+    stats = get_stats()
+    text = (
+        "👑 <b>BOSHQARUV PANELI (ADMIN DASHBOARD)</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"👤 <b>Admin:</b> <code>{message.from_user.id}</code>\n"
+        f"⏱ <b>Bot ishlash vaqti:</b> {format_uptime()}\n\n"
+        "📊 <b>Qisqacha Statistika:</b>\n"
+        f"• 👥 Jami a'zolar: <b>{stats['total']} ta</b>\n"
+        f"• ⚡ Bugun qo'shilgan: <b>+{stats['today']} ta</b>\n"
+        f"• 📈 Faol (oxirgi 24s): <b>{stats['active_24h']} ta</b>\n"
+        f"• 🗓 Oxirgi 7 kunda: <b>+{stats['week']} ta</b>\n\n"
+        "👇 <i>Kerakli amalni tanlang:</i>"
+    )
+    await message.answer(text, parse_mode="HTML", reply_markup=build_admin_keyboard())
+
+
+@dp.callback_query(F.data == "admin_refresh")
+@dp.callback_query(F.data == "admin_stats")
+async def callback_admin_stats(callback: types.CallbackQuery):
+    if not callback.from_user or not is_admin(callback.from_user.id):
+        await callback.answer("Ruxsat berilmagan!", show_alert=True)
+        return
+
+    await callback.answer("Statistika yangilandi 🔄")
+    stats = get_stats()
+    text = (
+        "📊 <b>TO'LIQ STATISTIKA VA KO'RSATKICHLAR</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"👥 <b>Jami foydalanuvchilar:</b> <code>{stats['total']}</code> ta\n"
+        f"⚡ <b>Bugun kirganlar:</b> <code>+{stats['today']}</code> ta\n"
+        f"📈 <b>24 soat ichida faol:</b> <code>{stats['active_24h']}</code> ta\n"
+        f"🗓 <b>Haftalik o'sish:</b> <code>+{stats['week']}</code> ta\n"
+        f"🕒 <b>Bot Uptime:</b> {format_uptime()}\n"
+        f"📅 <b>Sana:</b> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        "✅ Barcha ma'lumotlar real vaqtda bazadan hisoblandi."
+    )
+    try:
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=build_admin_keyboard())
+    except Exception:
+        pass
+
+
+async def render_keep_alive_task():
+    """Render bepul serverini har 5 daqiqada avtomatik ping qilib uyg'oq saqlash"""
+    while True:
+        try:
+            await asyncio.sleep(300) # 5 daqiqa
+            async with aiohttp.ClientSession() as session:
+                ping_url = f"{RENDER_BACKEND_URL}/ping"
+                async with session.get(ping_url, timeout=aiohttp.ClientTimeout(total=20)) as resp:
+                    logger.info(f"Render keep-alive ping yuborildi: status={resp.status}")
+        except Exception as e:
+            logger.warning(f"Render keep-alive xatolik: {e}")
+
+@dp.callback_query(F.data == "admin_servers")
+async def callback_admin_servers(callback: types.CallbackQuery):
+    if not callback.from_user or not is_admin(callback.from_user.id):
+        await callback.answer("Ruxsat yo'q!", show_alert=True)
+        return
+
+    await callback.answer("Serverlar tekshirilmoqda... ⏳")
+    loading_msg = await callback.message.edit_text("⏳ <i>Serverlar va API holati tekshirilmoqda...</i>", parse_mode="HTML")
+
+    # Render Backend check (/ping)
+    backend_ok, b_code, b_latency = await check_url_health(f"{RENDER_BACKEND_URL}/ping")
+    b_status = f"🟢 Online ({b_latency} ms)" if backend_ok else f"🔴 Kutishda / Offline (kod: {b_code})"
+
+    # Frontend Vercel check
+    front_ok, f_code, f_latency = await check_url_health(WEBAPP_URL)
+    f_status = f"🟢 Online ({f_latency} ms)" if front_ok else f"🔴 Xatolik (kod: {f_code})"
+
+    text = (
+        "🌐 <b>TIZIM VA SERVERLAR HOLATI (HEALTH CHECK)</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "🖥 <b>Render FastAPI Backend:</b>\n"
+        f"• Status: {b_status}\n"
+        f"• URL: <code>{RENDER_BACKEND_URL}</code>\n\n"
+        "📱 <b>Vercel Frontend (Web App):</b>\n"
+        f"• Status: {f_status}\n"
+        f"• URL: <code>{WEBAPP_URL}</code>\n\n"
+        "🤖 <b>Telegram Polling Bot:</b>\n"
+        f"• Status: 🟢 Ishlamoqda\n"
+        f"• Uptime: {format_uptime()}\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>💡 Eslatma: Render bepul server bo'lgani uchun 1-so'rovda 30-50 soniya uyg'onishi mumkin.</i>"
+    )
+    await loading_msg.edit_text(text, parse_mode="HTML", reply_markup=build_admin_keyboard())
+
+
+@dp.callback_query(F.data == "admin_users")
+async def callback_admin_users(callback: types.CallbackQuery):
+    if not callback.from_user or not is_admin(callback.from_user.id):
+        await callback.answer("Ruxsat yo'q!", show_alert=True)
+        return
+
+    await callback.answer()
+    users = get_latest_users(10)
+    if not users:
+        await callback.message.edit_text("Hozircha foydalanuvchilar mavjud emas.", reply_markup=build_admin_keyboard())
+        return
+
+    text = "👥 <b>OXIRGI 10 TA FOYDALANUVCHI:</b>\n━━━━━━━━━━━━━━━━━━━━━━\n\n"
+    for i, (u_id, u_name, f_name, date_str) in enumerate(users, 1):
+        mention = f"@{u_name}" if u_name else f"<code>{u_id}</code>"
+        safe_name = (f_name or "Noma'lum")[:15]
+        clean_date = date_str[:16].replace("T", " ") if date_str else ""
+        text += f"<b>{i}.</b> {safe_name} — {mention} | <i>{clean_date}</i>\n"
+
+    text += "\n━━━━━━━━━━━━━━━━━━━━━━"
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=build_admin_keyboard())
+
+
+@dp.callback_query(F.data == "admin_export")
+async def callback_admin_export(callback: types.CallbackQuery):
+    if not callback.from_user or not is_admin(callback.from_user.id):
+        await callback.answer("Ruxsat yo'q!", show_alert=True)
+        return
+
+    await callback.answer("Fayl tayyorlanmoqda... 📥")
+    users = get_latest_users(1000)
+    
+    # CSV yaratish
+    output = io.StringIO()
+    output.write("user_id,username,first_name,created_at\n")
+    for u in users:
+        output.write(f'"{u[0]}","{u[1]}","{u[2]}","{u[3]}"\n')
+    
+    csv_bytes = output.getvalue().encode("utf-8")
+    doc = BufferedInputFile(csv_bytes, filename=f"users_{datetime.now().strftime('%Y%m%d')}.csv")
+
+    await callback.message.answer_document(
+        document=doc,
+        caption="📁 <b>Barcha foydalanuvchilar ro'yxati (CSV eksport)</b>",
+        parse_mode="HTML"
+    )
+
+
+# ===================== BROADCAST (XABARNOMA) =====================
+
+@dp.callback_query(F.data == "admin_broadcast")
+async def callback_admin_broadcast(callback: types.CallbackQuery, state: FSMContext):
+    if not callback.from_user or not is_admin(callback.from_user.id):
+        await callback.answer("Ruxsat yo'q!", show_alert=True)
+        return
+
+    await callback.answer()
+    cancel_kb = InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text="❌ Bekor qilish", callback_data="cancel_broadcast")]]
+    )
+    await state.set_state(BroadcastState.waiting_for_message)
+    await callback.message.answer(
+        "📢 <b>XABARNOMA YUBORISH REJIMI</b>\n\n"
+        "Barcha foydalanuvchilarga yubormoqchi bo'lgan xabaringizni yuboring (matn, rasm yoki forward):\n\n"
+        "<i>Bekor qilish uchun pastdagi tugmani bosing:</i>",
+        parse_mode="HTML",
+        reply_markup=cancel_kb
+    )
+
+
+@dp.callback_query(F.data == "cancel_broadcast")
+async def callback_cancel_broadcast(callback: types.CallbackQuery, state: FSMContext):
+    await state.clear()
+    await callback.answer("Xabarnoma bekor qilindi.")
+    await callback.message.edit_text("❌ <b>Xabarnoma yuborish bekor qilindi.</b>", parse_mode="HTML", reply_markup=build_admin_keyboard())
+
+
+@dp.message(BroadcastState.waiting_for_message)
+async def process_broadcast_message(message: types.Message, state: FSMContext, bot: Bot):
+    if not message.from_user or not is_admin(message.from_user.id):
+        return
+
+    await state.clear()
+    user_ids = get_all_user_ids()
+    total = len(user_ids)
+
+    if total == 0:
+        await message.answer("⚠️ Baza hali bo'sh, foydalanuvchilar yo'q.", reply_markup=build_admin_keyboard())
+        return
+
+    status_msg = await message.answer(f"⏳ Xabar {total} ta foydalanuvchiga yuborilmoqda...")
+
+    sent_count = 0
+    fail_count = 0
+
+    for uid in user_ids:
+        try:
+            await bot.copy_message(
+                chat_id=uid,
+                from_chat_id=message.chat.id,
+                message_id=message.message_id
+            )
+            sent_count += 1
+            await asyncio.sleep(0.04) # Telegram chekloviga tushmaslik uchun
+        except Exception:
+            fail_count += 1
+
+    log_broadcast(message.text or message.caption or "Media", sent_count, fail_count)
+
+    result_text = (
+        "📢 <b>XABARNOMA YAKUNLANDI!</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"✅ <b>Muvaffaqiyatli yetkazildi:</b> {sent_count} ta\n"
+        f"❌ <b>Yetkazilmadi (bloklaganlar):</b> {fail_count} ta\n"
+        f"👥 <b>Jami a'zolar:</b> {total} ta\n"
+        "━━━━━━━━━━━━━━━━━━━━━━"
+    )
+    await status_msg.edit_text(result_text, parse_mode="HTML", reply_markup=build_admin_keyboard())
+
+
+# ===================== COMMON HANDLERS =====================
+
 @dp.message(Command("app"))
 async def handle_app_command(message: types.Message):
-    """/app buyrug'i berilganda"""
     await message.answer(
         "🚀 <b>Ilovani ochish uchun quyidagi tugmani bosing:</b>",
         parse_mode="HTML",
@@ -126,7 +426,6 @@ async def handle_app_command(message: types.Message):
 
 @dp.message(Command("help"))
 async def handle_help(message: types.Message):
-    """/help buyrug'i berilganda"""
     help_text = (
         "📖 <b>Botdan foydalanish bo'yicha qo'llanma:</b>\n\n"
         "1. <b>'IELTS Speaking AI ni ochish'</b> tugmasini bosing.\n"
@@ -143,11 +442,10 @@ async def handle_help(message: types.Message):
 
 @dp.callback_query(F.data == "about_bot")
 async def handle_about_callback(callback: types.CallbackQuery):
-    """'Bot haqida' tugmasi bosilganda"""
     await callback.answer()
     info_text = (
         "🤖 <b>AI Speaking Analyzer Web App</b>\n\n"
-        "Ushbu ilova sun'iy intellekt (Whisper STT + Qwen LLM) asosida ishlaydi.\n"
+        "Ushbu ilova sun'iy intellekt (Whisper STT + Gemini LLM) asosida ishlaydi.\n"
         "Talabalarga IELTS Speaking imtihoniga tayyorlanishda tezkor va aniq feedback beradi."
     )
     await callback.message.answer(
@@ -157,41 +455,36 @@ async def handle_about_callback(callback: types.CallbackQuery):
     )
 
 
+# Har qanday boshqa xabarlarda ham faollikni saqlash
+@dp.message()
+async def handle_all_messages(message: types.Message):
+    if message.from_user:
+        upsert_user(
+            user_id=message.from_user.id,
+            username=message.from_user.username or "",
+            first_name=message.from_user.first_name or "",
+            last_name=message.from_user.last_name or ""
+        )
+
+
 async def main():
-    if not BOT_TOKEN or BOT_TOKEN == "BOT_TOKEN_SHU_YERGA_YOZILADI":
-        print("\n" + "=" * 60)
-        print("❌ XATOLIK: BOT_TOKEN ko'rsatilmagan!")
-        print("Iltimos, telegram-bot/.env fayliga bot tokeningizni kiriting:")
-        print("BOT_TOKEN=123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ")
-        print("=" * 60 + "\n")
+    if not BOT_TOKEN:
+        logger.error("BOT_TOKEN ko'rsatilmagan!")
         sys.exit(1)
 
-    if not WEBAPP_URL or WEBAPP_URL == "https://sizning-saytingiz-manzili.uz":
-        print("\n" + "=" * 60)
-        print("❌ XATOLIK: WEBAPP_URL ko'rsatilmagan!")
-        print("Iltimos, telegram-bot/.env fayliga saytingiz HTTPS manzilini kiriting:")
-        print("WEBAPP_URL=https://...")
-        print("=" * 60 + "\n")
-        sys.exit(1)
-
-    if not WEBAPP_URL.startswith("https://"):
-        print("\n" + "=" * 60)
-        print("⚠️ OGOHLANTIRISH: Telegram Web App faqat HTTPS manzillarni qabul qiladi!")
-        print(f"Joriy URL: {WEBAPP_URL}")
-        print("Lokal test uchun ngrok yoki Cloudflare Tunnel orqali HTTPS havola oling.")
-        print("=" * 60 + "\n")
-
+    init_db()
     bot = Bot(token=BOT_TOKEN)
 
     print("\n" + "=" * 60)
     print("🤖 Telegram bot ishga tushmoqda...")
     print(f"🔗 Web App URL: {WEBAPP_URL}")
+    print(f"👑 Admin ID: {ADMIN_ID}")
     print("=" * 60)
 
     try:
-        # Eski keshdagi webhooklarni o'chirish
         await bot.delete_webhook(drop_pending_updates=True)
-        # Polling boshlash
+        # Render serverini doim uyg'oq saqlovchi fon vazifasini ishga tushirish
+        asyncio.create_task(render_keep_alive_task())
         await dp.start_polling(bot)
     finally:
         await bot.session.close()

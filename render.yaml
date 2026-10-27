@@ -12,3 +12,9 @@ services:
         value: gemini-3.5-flash
       - key: RENDER_EXTERNAL_URL
         value: https://speaking-app-nqdr.onrender.com
+      - key: BOT_TOKEN
+        value: 8233271812:AAFbWNMgJzNzKok2Qlp3XAhIO2KQeUE2dHA
+      - key: ADMIN_ID
+        value: 6094022048
+      - key: WEBAPP_URL
+        value: https://speaking-app-git-main-khan-d076.vercel.app/
