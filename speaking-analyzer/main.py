@@ -1,3 +1,9 @@
+import sys
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(line_buffering=True)
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(line_buffering=True)
+
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -62,10 +68,12 @@ def _start_bot_thread():
     time.sleep(5)  # Serverning portni band qilishini kutish
     try:
         from bot_service import run_bot
-        print("[TelegramBot] Render serverida 24/7 Telegram bot ishga tushmoqda...")
+        print("[TelegramBot] Render serverida 24/7 Telegram bot ishga tushmoqda...", flush=True)
         run_bot()
     except Exception as e:
-        print(f"[TelegramBot] Xatolik yuz berdi: {e}")
+        import traceback
+        print(f"[TelegramBot] Xatolik yuz berdi: {e}", flush=True)
+        traceback.print_exc()
 
 _bot_thread = threading.Thread(target=_start_bot_thread, daemon=True)
 _bot_thread.start()
