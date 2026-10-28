@@ -125,10 +125,13 @@ def log_broadcast(text: str, sent: int, failed: int):
         logging.error(f"log_broadcast error: {e}")
 
 # Bot sozlamalari
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8233271812:AAFbWNMgJzNzKok2Qlp3XAhIO2KQeUE2dHA").strip()
-WEBAPP_URL = os.getenv("WEBAPP_URL", "https://speaking-app-git-main-khan-d076.vercel.app/").strip()
-ADMIN_ID = int(os.getenv("ADMIN_ID", "6094022048"))
-RENDER_BACKEND_URL = os.getenv("RENDER_BACKEND_URL", "https://speaking-app-nqdr.onrender.com").strip()
+BOT_TOKEN = (os.getenv("BOT_TOKEN") or "8233271812:AAFbWNMgJzNzKok2Qlp3XAhIO2KQeUE2dHA").strip()
+WEBAPP_URL = (os.getenv("WEBAPP_URL") or "https://speaking-app-git-main-khan-d076.vercel.app/").strip()
+try:
+    ADMIN_ID = int((os.getenv("ADMIN_ID") or "6094022048").strip())
+except Exception:
+    ADMIN_ID = 6094022048
+RENDER_BACKEND_URL = (os.getenv("RENDER_BACKEND_URL") or "https://speaking-app-nqdr.onrender.com").strip()
 
 BOT_START_TIME = time.time()
 logger = logging.getLogger("telegram_bot_service")
@@ -511,10 +514,15 @@ async def handle_all_messages(message: types.Message):
 async def _run_bot_async():
     init_db()
     bot = Bot(token=BOT_TOKEN)
+    print("🤖 [TelegramBot] Cloud Telegram bot ishga tushmoqda...", flush=True)
     logger.info("Cloud Telegram bot ishga tushmoqda...")
     try:
-        await bot.delete_webhook(drop_pending_updates=True)
-        await dp.start_polling(bot)
+        await bot.delete_webhook(drop_pending_updates=False)
+        # handle_signals=False ikkilamchi thread'da signal xatoligi (ValueError) bermasligi uchun shart
+        await dp.start_polling(bot, handle_signals=False)
+    except Exception as e:
+        print(f"❌ [TelegramBot] Polling xatoligi: {e}", flush=True)
+        logger.error(f"Polling xatosi: {e}")
     finally:
         await bot.session.close()
 
